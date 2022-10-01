@@ -49,6 +49,15 @@ train_hogares<- train_hogares %>% mutate(Pobre_string=ifelse(Pobre==1,'Pobre','N
 PieChart(Pobre_string, hole=0, values="%", data=train_hogares, fill=1:2, weights=train_hogares$fex_c, radius=1, main="")
 
 
+test_hogares2<- test_hogares2 %>% mutate(Pobre_string2=ifelse(regression_model==1,'Pobre','No pobre'))
+PieChart(Pobre_string2, hole=0, values="%", data=test_hogares2, fill=1:2, weights=train_hogares$fex_c, radius=1, main="")
+
+
+
+
+test_hogares2<- test_hogares2 %>% mutate(Pobre_string=ifelse(classification_model==1,'Pobre','No pobre'))
+PieChart(Pobre_string, hole=0, values="%", data=test_hogares2, fill=1:2, weights=train_hogares$fex_c, radius=1, main="")
+#stargazer
 #######################    Arreglamos la base Paula   ###################################
 #Train
 dt_cabecpersonas <- train_personas %>% subset(P6050==1)
@@ -71,6 +80,7 @@ train_hogares2$arriendo_construido=ifelse(is.na(train_hogares2$P5130),train_hoga
 na_percentage_despues <-sapply(train_hogares2, function(id) sum(length(which(is.na(id))))/length(train_hogares2$id))#creo una función para saber cuantos NAs hay por columna 
 View(na_percentage_despues)
 names(train_hogares2)
+
 ####
 
 train_hogares2 <- mutate_at(train_hogares2, c("P5130", "P5140"), ~replace(., is.na(.), 0))
@@ -481,9 +491,10 @@ names(pre_test_c)
 test_hogares2$cuartospersona=(test_hogares$P5010/test_hogares$Npersug)
 
 # Pego clasificatorio:
+test_hogares2 <- left_join(test_hogares2, var_hogar_test, by = "id")
 test_hogares2$pred_logit_ng3 <- predict(logit_ng3, test_hogares2, type = "raw")
 test_hogares2 <- pre_train_c %>% mutate(pred_logit_ng3=ifelse(pred_logit_ng3=="pobre", 1, 0))
-test_hogares2 <- left_join(test_hogares2, var_hogar_test, by = "id")
+
 # Pego regresión:
 
 test_hogares2$pred_logit_ng3 <- predict(logit_ng3, test_hogares2, type = "raw")
@@ -498,15 +509,14 @@ test_hogares2 <- test_hogares2 %>% mutate(pred_ridge=ifelse(pred_ridge=="pobre",
 
 
 names(test_hogares2)[names(test_hogares2) == "pred_ridge"] <- "regression_model"
-names(test_hogares2)[names(test_hogares2) == "P5140"] <- "classification_model"
+names(test_hogares2)[names(test_hogares2) == "pred_logit_ng3"] <- "classification_model"
 
-names(pre_train_c)
+
 test_hogares2 <- test_hogares2 %>% select(id, classification_model, regression_model)
 pre_train_c <- pre_train_c %>% select(id, Pobre, cuartospersona, Dominio, Npersug, Lp, arriendo)
 
 View(pre_train_c)
-stargazer(pre_train_c, type='text')
+stargazer(test_hogares2, type='text')
 
 
 write.csv(test_hogares2, file = "predictions_alarcon_gonzalez_lara_c4_r5.csv")
-
