@@ -194,6 +194,7 @@ auc_logit2 <- auc(pre_test_class$pred_logit2, pre_test_class$Pobre)
 auc_logit2
 
 Model_Metrics <- data.frame
+confusionMatrix(data=as.factor(pre_test_class$pred_logit2), reference = as.factor(pre_test_class$Pobre))
 
 Modelo <- c("Regresión", "Ridge (RMSE)", "Lasso (RMSE)", "Logit1 (AUC)", "Logit2 (AUC)")
 
@@ -201,6 +202,19 @@ Stat <- c(rmse_regress, rmse_ridge, rmse_lasso, auc_logit, auc_logit2)
 
 Métricas <- data.frame(Modelo, Stat)
 
+
+# Predicciones sobre test_hogares -----------------------------------------
+
+test_hogares$classification_model <- predict(logit2, test_hogares, type = "raw")
+test_hogares$regression_model <- predict(lasso, test_hogares, type = "raw")
+
+predictions <- test_hogares %>% transmute(id=id,
+               classification_model=ifelse(classification_model=="pobre", 1, 0),
+               regression_model=ifelse(regression_model/Nper>=Lp, 1, 0)) 
+
+setwd("C:/Users/mlara/Desktop/BD&ML/Problem sets/Problem Set 2/ps2_bdml_2022-2")
+            
+write.csv(predictions, "C:\\Users\\mlara\\Desktop\\BD&ML\\Problem sets\\Problem Set 2\\ps2_bdml_2022-2\\predictions_alarcon_gonzalez_lara_c5_c4.csv")
 #set.seed(1234)
 #no_cores <- detectCores() - 1
 #
