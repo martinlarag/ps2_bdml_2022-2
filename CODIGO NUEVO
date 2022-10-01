@@ -210,8 +210,8 @@ predict(reglineal, pre_train_r)
 y_hat_reglin_in <- predict(reglineal, pre_train_r, type="response")
 y_hat_reglin_out <- predict(reglineal, pre_test_r, type="response")
 
-rmse_in1 <- RMSE (y_hat_reglin_in, pre_train$Ingpcug)
-rmse_out1 <- RMSE(y_hat_reglin_out, pre_test$Ingpcug)
+rmse_in1 <- RMSE (y_hat_reglin_in, pre_train_r$Ingpcug)
+rmse_out1 <- RMSE(y_hat_reglin_out, pre_test_r$Ingpcug)
 
 resultados <- rbind(data.frame(Modelo = "RegresiÃ³n lineal", 
                                Muestra = "Fuera",
@@ -227,7 +227,7 @@ pretrain_mtx = model.matrix(Ingpcug ~ n_ninis + n_ocupa + n_cotiza + t_person_et
 #ElecciÃ³n lambda Ã³ptimo con Cross-Validation
 
 lasso_cv=cv.glmnet(x=pretrain_mtx,y=pretrain_ing,alpha=1, standardize = T)
-lasso_=cv
+lasso_cv
 lasso_cv %>% glance()
 lasso_lambda_opt = lasso_cv$lambda.min
 
@@ -257,7 +257,7 @@ ridge.mod=glmnet(x=pretrain_mtx,
 ridge_cv=cv.glmnet(x=pretrain_mtx,y=pretrain_ing,alpha=0, standardize = T)
 ridge_lambda_opt = ridge_cv$lambda.min
 
-ridge<-train(Ingpcug ~ P5000 + P5010 + age2 + age3 + age4 + fem2 + femage + femage2 +
+ridgeP<-train(Ingpcug ~ P5000 + P5010 + age2 + age3 + age4 + fem2 + femage + femage2 +
                P6040 + P6210s1_imp,
              data = pre_train_r,
              method = 'glmnet', 
@@ -265,7 +265,7 @@ ridge<-train(Ingpcug ~ P5000 + P5010 + age2 + age3 + age4 + fem2 + femage + fema
              standardize = T)
 
 
-pre_test_r$pred_ridge <- predict(ridge, pre_test_r, type = "raw")
+pre_test_r$pred_ridge <- predict(ridgeP, pre_test_r, type = "raw")
 
 rmse_out3 <- RMSE(pre_test_r$pred_ridge, pre_test_r$Ingpcug)
 
@@ -293,7 +293,7 @@ elasticnet<-train(Ingpcug ~ P5000 + P5010 + age2 + age3 + age4 + fem2 + femage +
 
 pre_test_r$pred_elastic <- predict(elasticnet, pre_test_r, type = "raw")
 
-rmse_out4 <- RMSE(pre_test_r$pred_elastic, pre_test$Ingpcug)
+rmse_out4 <- RMSE(pre_test_r$pred_elastic, pre_test_r$Ingpcug)
 
 resultados4 <- rbind(data.frame(Modelo = "Elastic Net", 
                                 Muestra = "Fuera",
@@ -435,9 +435,9 @@ names(pre_train_c)
 # names(test_hogares)[names(test_hogares) == "P5130"] <- "arriendo_mensual_estimacion"
 # names(test_hogares)[names(test_hogares) == "P5140"] <- "arriendo_mensual"
 pre_train_c$cuartospersona=(pre_train_c$P5010/pre_train_c$Npersug)
+pre_test_c$cuartospersona=(pre_test_c$P5010/pre_test_c$Npersug)
 
-
-model_ng <- as.formula("pobre_factor~cuartospersona+arriendo+factor(P5090)+P5000+factor(Dominio)+ age2 + age3 + fem2")
+model_ng <- as.formula("pobre_factor~cuartospersona+arriendo+n_cotiza+ age2")
 
 logit_ng3 = train(model_ng,
                data=pre_train_c,
@@ -473,17 +473,40 @@ cm[1,1]/sum(cm[,1]) #Specificity
 cm[2,1]/sum(cm[2,]) # Ratio Falsos Positivos
 cm[1,2]/sum(cm[1,]) # Ratio Falsos Negativos
 
+auc_logit_ng3 <- auc(pre_test_c$pred_logit_ng3, pre_test_c$Pobre)
+auc_logit_ng3
+names(pre_test_c)
+
+#### Ahora voy a sacar los valores predichos en la de hogares test:
+test_hogares2$cuartospersona=(test_hogares$P5010/test_hogares$Npersug)
+
+# Pego clasificatorio:
+test_hogares2$pred_logit_ng3 <- predict(logit_ng3, test_hogares2, type = "raw")
+test_hogares2 <- pre_train_c %>% mutate(pred_logit_ng3=ifelse(pred_logit_ng3=="pobre", 1, 0))
+test_hogares2 <- left_join(test_hogares2, var_hogar_test, by = "id")
+# Pego regresión:
+
+test_hogares2$pred_logit_ng3 <- predict(logit_ng3, test_hogares2, type = "raw")
+test_hogares2 <- test_hogares2 %>% mutate(pred_logit_ng3=ifelse(pred_logit_ng3=="pobre", 1, 0))
+
+test_hogares2$pred_logit_ng3 <- predict(logit_ng3, test_hogares2, type = "raw")
+test_hogares2 <- test_hogares2 %>% mutate(pred_logit_ng3=ifelse(pred_logit_ng3=="pobre", 1, 0))
+
+test_hogares2$pred_ridge <- predict(ridgeP, test_hogares2, type = "raw")
+test_hogares2 <- test_hogares2 %>% mutate(pred_ridge=ifelse(pred_ridge=="pobre", 1, 0))
+
+
+
+names(test_hogares2)[names(test_hogares2) == "pred_ridge"] <- "regression_model"
+names(test_hogares2)[names(test_hogares2) == "P5140"] <- "classification_model"
+
+names(pre_train_c)
+test_hogares2 <- test_hogares2 %>% select(id, classification_model, regression_model)
+pre_train_c <- pre_train_c %>% select(id, Pobre, cuartospersona, Dominio, Npersug, Lp, arriendo)
+
+View(pre_train_c)
 stargazer(pre_train_c, type='text')
 
 
-##Comparaciones
+write.csv(test_hogares2, file = "predictions_alarcon_gonzalez_lara_c4_r5.csv")
 
-Model_Metrics <- data.frame
-
-Modelo <- c("Logit1 (AUC)", "Logit2 (AUC)", "Logit5 (AUC)", "Probit (AUC)")
-
-Stat <- c(auc_logit, auc_logit2, auc_logit5, auc_probit)
-
-MÃ©tricas <- data.frame(Modelo, Stat)
-
-View(MÃ©tricas)
